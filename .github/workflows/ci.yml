@@ -12,7 +12,7 @@ permissions:
 
 env:
   AWS_REGION: eu-central-1
-  ECR_REPOSITORY: ghost-shell-portfolio
+  ECR_REPOSITORY: portofolo.webiste
 
 jobs:
   test:
