@@ -1,0 +1,83 @@
+name: Deploy GHOST SHELL to AWS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ghost-shell-production
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-central-1
+  AWS_ACCOUNT_ID: "674709627512"
+  ECR_REPOSITORY: portofolo.webiste
+  ECS_SERVICE: ghost-shell-portfolio
+  ECS_CLUSTER: default
+
+jobs:
+  deploy:
+    name: Deploy to ECS Express
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::674709627512:role/ghost-shell-github-actions
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify Docker image exists in ECR
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE_DIGEST=$(aws ecr batch-get-image \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag="$IMAGE_TAG" \
+            --query 'images[0].imageId.imageDigest' \
+            --output text)
+
+          if [ -z "$IMAGE_DIGEST" ] || [ "$IMAGE_DIGEST" = "None" ]; then
+            echo "No published image found for commit $IMAGE_TAG"
+            exit 1
+          fi
+
+          echo "Found image: $IMAGE_DIGEST"
+
+      - name: Deploy to Amazon ECS Express
+        id: deploy
+        uses: aws-actions/amazon-ecs-deploy-express-service@v1
+        with:
+          service-name: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          image: 674709627512.dkr.ecr.eu-central-1.amazonaws.com/portofolo.webiste:${{ github.sha }}
+          execution-role-arn: arn:aws:iam::674709627512:role/ecsTaskExecutionRole
+          infrastructure-role-arn: arn:aws:iam::674709627512:role/ecsInfrastructureRoleForExpressServices
+          container-port: 8080
+          health-check-path: /health
+          cpu: "256"
+          memory: "512"
+          min-task-count: "1"
+          max-task-count: "1"
+          environment-variables: |
+            [
+              {"name":"APP_VERSION","value":"v1.0.0"},
+              {"name":"APP_ENV","value":"production"},
+              {"name":"APP_PLATFORM","value":"AWS ECS Express"},
+              {"name":"GIT_SHA","value":"${{ github.sha }}"}
+            ]
+
+      - name: Show deployment result
+        env:
+          SERVICE_URL: ${{ steps.deploy.outputs.endpoint }}
+          SERVICE_ARN: ${{ steps.deploy.outputs.service-arn }}
+        run: |
+          echo "ECS service: $SERVICE_ARN"
+          echo "Application URL: $SERVICE_URL"
+          echo "Deployment image commit: $GITHUB_SHA"
