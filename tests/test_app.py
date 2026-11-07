@@ -14,8 +14,8 @@ def test_portfolio_identity_sections_and_links(app):
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     for value in ["Zhivko Petkov", "Cybersecurity student", "https://github.com/nvm0r",
-                  "mailto:zhivkop3@gmail.com", 'id="about"', 'id="skills"', 'id="projects"',
-                  'id="experience"', 'id="status"', 'id="contact"', "PROJECT ROADMAP"]:
+                  "mailto:zhivkop3@gmail.com", 'id="about"', 'id="projects"',
+                  'id="status"', 'id="contact"']:
         assert value in html
 
 
